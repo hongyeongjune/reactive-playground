@@ -22,6 +22,11 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+
+    // reactor
+    // https://mvnrepository.com/artifact/io.projectreactor/reactor-core
+    implementation("io.projectreactor:reactor-core")
+
 }
 
 tasks.withType<KotlinCompile> {
