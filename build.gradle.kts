@@ -26,6 +26,8 @@ dependencies {
     // reactor
     // https://mvnrepository.com/artifact/io.projectreactor/reactor-core
     implementation("io.projectreactor:reactor-core")
+    // https://mvnrepository.com/artifact/io.projectreactor/reactor-test
+    testImplementation("io.projectreactor:reactor-test:3.5.8")
 
 }
 
