@@ -5,4 +5,5 @@
 [Cold Sequence and Hot Sequence](https://github.com/hongyeongjune/reactive-playground/blob/master/document/cold-and-hot-sequence.md)  
 [Backpressure](https://github.com/hongyeongjune/reactive-playground/blob/main/document/backpressure.md)  
 [Sinks](https://github.com/hongyeongjune/reactive-playground/blob/main/document/sinks.md)  
-[Schedulers](https://github.com/hongyeongjune/reactive-playground/blob/main/document/scheduler.md)
+[Schedulers](https://github.com/hongyeongjune/reactive-playground/blob/main/document/scheduler.md)  
+[Operator](https://github.com/hongyeongjune/reactive-playground/blob/main/document/operator.md)
