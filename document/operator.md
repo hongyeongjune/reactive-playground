@@ -378,3 +378,89 @@ fun main() {
 ```shell
 22:27:23.961 [main] INFO com.example.playground.operators.CollectListOperator -- # onNext: [naver, naver webtoon, line]
 ```
+
+### doOnXXXX
+* Upstream Publisher 에서 emit 되는 데이터의 변경 없이 부수 효과만을 수행하기 위한 Operator
+* doOnXXXX 는 Consumer 또는 Runnable 타입의 함수형 인터페이스를 파라미터로 가지기 때문에 별도의 리턴 값이 없다.
+* 따라서 Upstream Publisher 로부터 emit 되는 데이터를 이용해 Upstream Publisher 의 내부 동작을 엿볼 수 있으며 로그를 출력하는 등의 디버깅 용도로 많이 사용된다.
+
+Operator|설명
+---|---
+doOnSubscribe()|Publisher 가 구독 중일 때 트러기되는 동작을 추가할 수 있다.
+doOnRequest()|Publisher 가 요청을 수신할 떄 트리거되는 동작을 추가할 수 있다.
+doOnNext()|Publisher 가 데이터를 emit 할 때 트리거되는 동작을 추가할 수 있다.
+doOnComplete()|Publisher 가 성공적으로 완료되었을 때 트리거되는 동작을 추가할 수 있다.
+doOnError()|Publisher 가 에러가 발생한 상태로 종료되었을 때 트리거되는 동작을 추가할 수 있다.
+doOnCancel()|Publisher 가 취소되었을 때 트러기되는 동작을 추가할 수 있다.
+doOnTerminate()|Publisher 가 성공적으로 완료되었을 때 또는 에러가 발생한 상태로 종료되었을 때 트러기되는 동작을 추가할 수 있다.
+doOnEach()|Publisher 가 데이터를 emit 할 때, 성공적으로 완료되었을 때, 에러가 발생한 상태로 종료되었을 때 트리거되는 동작을 추가할 수 있다.
+doOnDiscard()|Upstream 에 있는 전체 Operator 체인의 동작 중에서 Operator 에 의해 폐기되는 요소를 조건부로 정리할 수 있다.
+doAfterTeminate()|Downstream 을 성공적으로 완료한 직후 또는 에러가 발생하여 Publisher 가 종료된 직후에 트리거되는 동작을 추가할 수 있다.
+doFirst()|Publisher 가 구독되기 전에 트리거되는 동작을 추가할 수 있다.
+doFinally()|에러를 포함해서 어떤 이유이든 간에 Publisher 가 종료된 후 트리거되는 동작을 추가할 수 있다.
+
+
+### error
+![images](https://projectreactor.io/docs/core/release/api/reactor/core/publisher/doc-files/marbles/error.svg)
+![imaegs](https://projectreactor.io/docs/core/release/api/reactor/core/publisher/doc-files/marbles/error.svg)
+> https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Mono.html#error-java.lang.Throwable-
+> https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Flux.html#error-java.lang.Throwable-
+
+* error() Operator 는 파라미터로 지정된 에러로 종료하는 Flux 를 생성한다.
+
+```kotlin
+fun main() {
+  val logger = LoggerFactory.getLogger(ErrorOperator::class.java)
+
+  Flux.range(1, 5)
+    .flatMap {
+      if (it * 2 % 3 == 0) {
+        Flux.error(
+          IllegalArgumentException("Not allowed multiple of 3")
+        )
+      } else {
+        Mono.just(it * 2)
+      }
+    }
+    .subscribe(
+      { data -> logger.info("# onNext: $data") },
+      { error -> logger.error("# onError: $error") }
+    )
+}
+```
+
+```shell
+00:12:33.523 [main] INFO com.example.playground.operators.ErrorOperator -- # onNext: 2
+00:12:33.524 [main] INFO com.example.playground.operators.ErrorOperator -- # onNext: 4
+00:12:33.525 [main] ERROR com.example.playground.operators.ErrorOperator -- # onError: java.lang.IllegalArgumentException: Not allowed multiple of 3
+```
+
+### onErrorReturn
+![images](https://projectreactor.io/docs/core/release/api/reactor/core/publisher/doc-files/marbles/onErrorReturnForMono.svg)
+![images](https://projectreactor.io/docs/core/release/api/reactor/core/publisher/doc-files/marbles/onErrorReturnForFlux.svg)
+> https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Mono.html#onErrorReturn-java.lang.Class-T-
+> https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Flux.html#onErrorReturn-java.lang.Class-T-
+
+* 에러 이벤트가 발생했을 때 에러 이벤트를 Downstream 으로 전파하지 않고 대체 값을 emit 한다.
+* 꼭 Exception 을 명시하지않으면, Exception 이 발생하기만 하면 return 된다.
+
+```kotlin
+fun main() {
+    val logger = LoggerFactory.getLogger(ErrorOnReturnOperator::class.java)
+
+    Flux.just("naver", "naver webtoon", null, "line")
+        .map { it!!.uppercase() }
+        .onErrorReturn(NullPointerException::class.java, "no name")
+        .subscribe {
+            logger.info(it)
+        }
+
+    Thread.sleep(200L)
+}
+```
+
+```shell
+00:19:07.906 [main] INFO com.example.playground.operators.ErrorOnReturnOperator -- NAVER
+00:19:07.907 [main] INFO com.example.playground.operators.ErrorOnReturnOperator -- NAVER WEBTOON
+00:19:07.907 [main] INFO com.example.playground.operators.ErrorOnReturnOperator -- no name
+```
