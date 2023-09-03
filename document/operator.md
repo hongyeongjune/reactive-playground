@@ -466,8 +466,10 @@ fun main() {
 ```
 
 ### onErrorResume
-![images]()
->
+![images](https://projectreactor.io/docs/core/release/api/reactor/core/publisher/doc-files/marbles/onErrorResumeForMono.svg)
+![images]([https://projectreactor.io/docs/core/release/api/reactor/core/publisher/doc-files/marbles/onErrorResumeForMono.svg](https://projectreactor.io/docs/core/release/api/reactor/core/publisher/doc-files/marbles/onErrorResumeForFlux.svg))
+> https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Mono.html#onErrorResume-java.lang.Class-java.util.function.Function-
+> https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Flux.html#onErrorResume-java.lang.Class-java.util.function.Function-
 
 * 에러 이벤트가 발생했을 때, 에러 이벤트를 Downstream 으로 전파하지 않고, 대체 Publisher 를 리턴한다.
 
@@ -500,29 +502,30 @@ fun main() {
 ```
 
 ### onErrorContinue
-![images]()
->
-
 * 에러가 발생했을 때, 에러 영역 내에 있는 데이터는 제거하고, Upstream 에서 후속 데이터를 emit 하는 방식으로 에러를 복구할 수 있도록 해준다.
 * 예를 들어, ```Flux.just(1, 2, 4, 0, 6, 12).map { 12 / it }```에서 4번 째 0 에서는 에러가 발생해도 6, 12 에 대한 값은 그대로 실행한다.
 
 ### retry
-![images]()
->
+![images](https://projectreactor.io/docs/core/release/api/reactor/core/publisher/doc-files/marbles/retryWithAttemptsForMono.svg)
+![images](https://projectreactor.io/docs/core/release/api/reactor/core/publisher/doc-files/marbles/retryWithAttemptsForFlux.svg)
+> https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Mono.html#retry-long-
+> https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Flux.html#retry-long-
 
 * Publisher 가 데이터를 emit 하는 과정에서 에러가 발생하면 파라미터로 입력한 횟수만큼 원본 Flux 의 Sequence 를 다시 구독한다.
 
 ### elapsed
-![images]()
->
+![images](https://projectreactor.io/docs/core/release/api/reactor/core/publisher/doc-files/marbles/elapsedForMono.svg)
+![images](https://projectreactor.io/docs/core/release/api/reactor/core/publisher/doc-files/marbles/elapsedForFlux.svg)
+> https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Mono.html#elapsed-reactor.core.scheduler.Scheduler-
+> https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Flux.html#elapsed-reactor.core.scheduler.Scheduler-
 
 * emit 된 데이터 사이의 경과 시간을 측정해서 Tuple<Long, T> 형태로 Downstream 에 emit 한다.
 * Tuple 의 Long 은 시간, T 는 데이터이다.
 * 첫 번째 데이터는 onSubscribe Signal 과 첫 번째 데이터 사이를 기준으로 시간을 측정한다.
 
 ### window
-![images]()
->
+![images](https://projectreactor.io/docs/core/release/api/reactor/core/publisher/doc-files/marbles/windowWithTimespan.svg)
+> https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Flux.html#window-java.time.Duration-
 
 * Upstream 에서 emit 되는 첫 번째 데이터부터 maxSize 숫자만큼 데이터를 포함하는 새로운 Flux 로 분할한다.
 * Reactor 에서는 이렇게 분리된 Flux 를 Window 라고 부른다.
@@ -573,30 +576,30 @@ fun main() {
 ```
 
 ### buffer
-![images]()
->
+![images](https://projectreactor.io/docs/core/release/api/reactor/core/publisher/doc-files/marbles/bufferWithTimespan.svg)
+> https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Flux.html#buffer-java.time.Duration-
 
 * Upstream 에서 emit 되는 첫 번째 데이터부터 maxSize 숫자만큼의 데이터를 List 버퍼로 한 번에 emit 한다.
 * 마지막 버퍼에 포함된 데이터의 개수는 maxSize 보다 더 적거나 같다.
 * 예를 들어, ```Flux.range(1, 95).buffer(10).subsribe(...)```의 경우에는 emit 된 데이터가 최대 10개까지 버퍼에 담기면 List 버퍼 형태로 Downstream 에 emit 한다.
 
 ### bufferTimeout
-![images]()
->
+![images](https://projectreactor.io/docs/core/release/api/reactor/core/publisher/doc-files/marbles/bufferTimeoutWithMaxSizeAndTimespan.svg)
+> https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Flux.html#bufferTimeout-int-java.time.Duration-
 
 * Upstream 에서 emit 되는 첫 번째 데이터부터 maxSize 숫자만큼의 데이터 또는 maxTime 내에 emit 된 데이터를 List 버퍼로 한 번에 emit 한다.
 * 또한, maxSize 혹은 maxTime 중 먼저 조건에 부합할 때까지 emit 된 데이터를 List 버퍼로 emit 한다.
 
 ### groupBy
-![images]()
->
+![images](https://projectreactor.io/docs/core/release/api/reactor/core/publisher/doc-files/marbles/groupByWithKeyMapper.svg)
+> https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Flux.html#groupBy-java.util.function.Function-
 
 * emit 되는 데이터를 keyMapper 로 생성한 key를 기준으로 그룹화한 GroupedFlux 를 리턴하며, 이 GroupedFlux 를 통해서 그룹별로 작업을 수행할 수 있다.
 * groupBy 마블 다이어그램에서는 emit 되는 도형의 모양별로 그룹화하여 그룹별로 별도의 GroupedFlux Sequence 가 생성된 것을 볼 수 있다.
 
 ### publish
-![images]()
->
+![images](https://projectreactor.io/docs/core/release/api/reactor/core/publisher/doc-files/marbles/publish.svg)
+> https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Flux.html#publish--
 
 * 구독을 하더라도 구독 시점에 즉시 데이터를 emit 하지 않고, connect() 를 호출하는 시점에 비로소 데이터를 emit 한다.
 * 그리고 Hot Sequence 로 변환되기 때문에 구독 시점 이후에 emit 된 데이터만 전달받을 수 있다.
@@ -643,15 +646,15 @@ fun main() {
 ```
 
 ### autoConnect
-![images]()
->
+![images](https://projectreactor.io/docs/core/release/api/reactor/core/publisher/doc-files/marbles/autoConnectWithMinSubscribers.svg)
+> https://projectreactor.io/docs/core/release/api/reactor/core/publisher/ConnectableFlux.html#autoConnect-int-
 
 * publish()는 구독이 발생하더라도 connect()를 직접 호출하기 전까지는 데이터를 emit 하지 않기 때문에 코드상에서 connect()를 직접 호출해야 한다.
 * 반면에 autoConnect()는 파라미터로 지정하는 숫자만큼의 구독이 발생하는 시점에 Upstream 소스에 자동으로 연결되기 때문에 별도의 connect() 호출이 필요하지 않습니다.
 
 ### refCount
-![images]()
->
+![images](https://projectreactor.io/docs/core/release/api/reactor/core/publisher/doc-files/marbles/refCountWithMinSubscribers.svg)
+> https://projectreactor.io/docs/core/release/api/reactor/core/publisher/ConnectableFlux.html#refCount-int-
 
 * 입력된 숫자만큼의 구독이 발생하는 시점에 Upstream 소스에 연결되며, 모든 구독이 취소되거나 Upstream 의 데이터 emit 이 종료되면 연결이 해제된다.
 * refCount() 는 주로 무한 스트림 상황에서 모든 구독이 취소될 경우 연결을 해제하는 데 사용할 수 있다.
