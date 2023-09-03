@@ -24,8 +24,8 @@ public interface HttpHandler {
 
 ```java
 public class HttpWebHandlerAdapter extends WebHandlerDecorator implements HttpHandler {
-  ...
-  @Override
+  	...
+  	@Override
 	public Mono<Void> handle(ServerHttpRequest request, ServerHttpResponse response) {
 		if (this.forwardedHeaderTransformer != null) {
 			try {
@@ -51,7 +51,7 @@ public class HttpWebHandlerAdapter extends WebHandlerDecorator implements HttpHa
 				.then(cleanupMultipart(exchange))
 				.then(Mono.defer(response::setComplete));
 	}
-  ...
+  	...
 }
 ```
 
@@ -69,9 +69,15 @@ public interface WebFilter {
 * WebHandler 인터페이스의 구현체로서 Spring MVC 에서 Front Controller 패턴이 적용된 DispatcherServlet 처럼 중앙에서 먼저 요청을 전달받은 후에 다른 컴포넌트에 요청 처리를 위임한다.
 * DispatcherHandler 자체가 Spring Bean 으로 등록되도록 설계되었으며, AppicationContext 에서 HandlerMapping, HandlerAdapter, HandlerResultHandler 등의 요청 처리를 위한 위임 컴포넌트를 검색한다.
 
+1. **initStrategies(ApplicationContext context)**
+    * initStrategies(ApplicationContext context)는 BeanFactoryUtils 를 이용해 ApplicationContext 로부터 HandlerMapping Bean, HandlerAdapter Bean, HandlerResultHandler Bean 을 검색한 후에 각각 List<HandlerMapping>, List<HandlerAdapter>, List<HandlerResultHandler> 객체를 생성한다.
+2. **handle(ServerWebExchange exchange)**
+    * handle(ServerWebExchange exchange)는 List<HandlerMapping>을 Flux.fromIterable() Operator 의 원본 데이터 소스로 입력받은 후에 getHandler() 메서드를 통해 매치되는 Handler 중 첫 번째 핸들러를 사용한다.
+    * handleRequestWith(ServerWebExchange exchange, Object handler)를 통해 핸들러 호출을 위임한다. (실제 핸들러 호출은 handleRequestWith() 내부에서 Handler 객체와 매핑되는 HandlerAdapter 를 통해서 이루어진다.)
+    * handleResult(ServerWebExchange exchange, HandlerResult result)를 통해 응답 처리를 위임한다. (실제 응답 처리는 handlerResult() 내부에서 호출한 doHandleResult() 에서 HandlerResult 객체와 매핑되는 HandlerResultHandler 를 통해서 이뤄진다.
 ```java
 public class DispatcherHandler implements WebHandler, PreFlightRequestHandler, ApplicationContextAware {
-  @Nullable
+  	@Nullable
 	private List<HandlerMapping> handlerMappings;
 
 	@Nullable
@@ -80,8 +86,8 @@ public class DispatcherHandler implements WebHandler, PreFlightRequestHandler, A
 	@Nullable
 	private List<HandlerResultHandler> resultHandlers;
 
-  ...
-  protected void initStrategies(ApplicationContext context) {
+  	...
+  	protected void initStrategies(ApplicationContext context) {
 		Map<String, HandlerMapping> mappingBeans = BeanFactoryUtils.beansOfTypeIncludingAncestors(
 				context, HandlerMapping.class, true, false);
 
@@ -101,8 +107,9 @@ public class DispatcherHandler implements WebHandler, PreFlightRequestHandler, A
 		this.resultHandlers = new ArrayList<>(beans.values());
 		AnnotationAwareOrderComparator.sort(this.resultHandlers);
 	}
-  ...
-  @Override
+  	...
+
+  	@Override
 	public Mono<Void> handle(ServerWebExchange exchange) {
 		if (this.handlerMappings == null) {
 			return createNotFoundError();
@@ -117,19 +124,25 @@ public class DispatcherHandler implements WebHandler, PreFlightRequestHandler, A
 				.onErrorResume(ex -> handleDispatchError(exchange, ex))
 				.flatMap(handler -> handleRequestWith(exchange, handler));
 	}
-  ...
-  private Mono<HandlerResult> invokeHandler(ServerWebExchange exchange, Object handler) {
-    if (this.handlerAdapters != null) {
-      for (HandlerAdapter handlerAdapter : this.handlerAdapters) {
-        if (handlerAdapter.supports(handler)) {
-          return handlerAdapter.handle(exchange, handler);
-        }
-      }
-    }
-    return Mono.error(new IllegalStateException("No HandlerAdapter: " + handler));
-  }
-  ...
-  private Mono<Void> handleResult(ServerWebExchange exchange, HandlerResult result) {
+
+	...
+  	private Mono<Void> handleRequestWith(ServerWebExchange exchange, Object handler) {
+		if (ObjectUtils.nullSafeEquals(exchange.getResponse().getStatusCode(), HttpStatus.FORBIDDEN)) {
+			return Mono.empty();  // CORS rejection
+		}
+		if (this.handlerAdapters != null) {
+			for (HandlerAdapter adapter : this.handlerAdapters) {
+				if (adapter.supports(handler)) {
+					return adapter.handle(exchange, handler)
+							.flatMap(result -> handleResult(exchange, result));
+				}
+			}
+		}
+		return Mono.error(new IllegalStateException("No HandlerAdapter: " + handler));
+	}
+
+	...
+  	private Mono<Void> handleResult(ServerWebExchange exchange, HandlerResult result) {
 		Mono<Void> resultMono = doHandleResult(exchange, result, "Handler " + result.getHandler());
 		if (result.getExceptionHandler() != null) {
 			resultMono = resultMono.onErrorResume(ex ->
@@ -139,17 +152,45 @@ public class DispatcherHandler implements WebHandler, PreFlightRequestHandler, A
 		}
 		return resultMono;
 	}
-  ...
-  private HandlerResultHandler getResultHandler(HandlerResult handlerResult) {
+
+	private Mono<Void> doHandleResult(
+			ServerWebExchange exchange, HandlerResult handlerResult, String description) {
+
 		if (this.resultHandlers != null) {
 			for (HandlerResultHandler resultHandler : this.resultHandlers) {
 				if (resultHandler.supports(handlerResult)) {
-					return resultHandler;
+					description += " [DispatcherHandler]";
+					return resultHandler.handleResult(exchange, handlerResult).checkpoint(description);
 				}
 			}
 		}
-		throw new IllegalStateException("No HandlerResultHandler for " + handlerResult.getReturnValue());
+		return Mono.error(new IllegalStateException(
+				"No HandlerResultHandler for " + handlerResult.getReturnValue()));
 	}
-  ...
+  	...
+}
+```
+
+#### HandlerMapping
+* getHandler(ServerWebExchange exchange) 추상 메서드 하나만 정의되어 있으며, getHandler() 메서드는 파라미터로 입력받은 ServerWebExchange 에 매치되는 handler object 를 리턴한다.
+
+```java
+public interface HandlerMapping {
+	Mono<Object> getHandler(ServerWebExchange exchange);
+}
+```
+
+#### HandlerAdapter
+* HandlerMapping 을 통해 얻은 핸들러를 직접적으로 호출하는 역할을 하며, 응답 결과로 Mono<HandlerResult>를 리턴받는다.
+* supports 메서드는 파라미터로 전달받은 handler object 를 지원하는지 체크한다.
+* handleResult 메서드는 파라미터로 전달받은 HandlerResult Object 를 통해 핸들러 메서드를 호출한다.
+
+```java
+/**
+ * Process the {@link HandlerResult}, usually returned by a {@link HandlerAdapter}.
+ */
+public interface HandlerResultHandler {
+	boolean supports(HandlerResult result);
+	Mono<Void> handleResult(ServerWebExchange exchange, HandlerResult result);
 }
 ```
