@@ -600,6 +600,7 @@ fun main() {
 
 * 구독을 하더라도 구독 시점에 즉시 데이터를 emit 하지 않고, connect() 를 호출하는 시점에 비로소 데이터를 emit 한다.
 * 그리고 Hot Sequence 로 변환되기 때문에 구독 시점 이후에 emit 된 데이터만 전달받을 수 있다.
+* 아래 예시를 보면, 구독3번은 1초 뒤에 시작하고 0.3마다 emit하기 때문에 1,2,3 은 구독1,2 만 4,5 는 전부다 출력되는 것을 볼 수 있다. (Hot Sequence)
 
 ```kotlin
 class PublishOperator
@@ -624,4 +625,82 @@ fun main() {
 
     Thread.sleep(2000L)
 }
+```
+
+```shell
+00:19:07.906 [main] INFO com.example.playground.operators.PublishOperator -- # subscribe1: 1
+00:19:07.906 [main] INFO com.example.playground.operators.PublishOperator -- # subscribe2: 1
+00:19:07.906 [main] INFO com.example.playground.operators.PublishOperator -- # subscribe1: 2
+00:19:07.906 [main] INFO com.example.playground.operators.PublishOperator -- # subscribe2: 2
+00:19:07.906 [main] INFO com.example.playground.operators.PublishOperator -- # subscribe1: 3
+00:19:07.906 [main] INFO com.example.playground.operators.PublishOperator -- # subscribe2: 3
+00:19:07.906 [main] INFO com.example.playground.operators.PublishOperator -- # subscribe1: 4
+00:19:07.906 [main] INFO com.example.playground.operators.PublishOperator -- # subscribe2: 4
+00:19:07.906 [main] INFO com.example.playground.operators.PublishOperator -- # subscribe3: 4
+00:19:07.906 [main] INFO com.example.playground.operators.PublishOperator -- # subscribe1: 5
+00:19:07.906 [main] INFO com.example.playground.operators.PublishOperator -- # subscribe2: 5
+00:19:07.906 [main] INFO com.example.playground.operators.PublishOperator -- # subscribe3: 5
+```
+
+### autoConnect
+![images]()
+>
+
+* publish()는 구독이 발생하더라도 connect()를 직접 호출하기 전까지는 데이터를 emit 하지 않기 때문에 코드상에서 connect()를 직접 호출해야 한다.
+* 반면에 autoConnect()는 파라미터로 지정하는 숫자만큼의 구독이 발생하는 시점에 Upstream 소스에 자동으로 연결되기 때문에 별도의 connect() 호출이 필요하지 않습니다.
+
+### refCount
+![images]()
+>
+
+* 입력된 숫자만큼의 구독이 발생하는 시점에 Upstream 소스에 연결되며, 모든 구독이 취소되거나 Upstream 의 데이터 emit 이 종료되면 연결이 해제된다.
+* refCount() 는 주로 무한 스트림 상황에서 모든 구독이 취소될 경우 연결을 해제하는 데 사용할 수 있다.
+* 아래 코드에서 2.1초 후에 구독을 해제해서 연결이 해제되고, 두 번째 구독이 발생할 경우에 다시 Upstream 에 연결된다.
+
+```kotlin
+class RefCountOperator
+
+fun main() {
+    val logger = LoggerFactory.getLogger(RefCountOperator::class.java)
+
+    val publisher = Flux.interval(Duration.ofMillis(500L))
+        .publish()
+//        .autoConnect(1)
+        .refCount(1)
+
+    val disposable = publisher.subscribe { logger.info("# subscribe 1:  $it") }
+
+    Thread.sleep(2100L)
+    disposable.dispose()
+
+    publisher.subscribe { logger.info("# subscribe 2: $it") }
+
+    Thread.sleep(2500L)
+}
+```
+
+```shell
+00:19:07.906 [main] INFO com.example.playground.operators.RefCountOperator -- # subscribe 1: 0
+00:19:07.906 [main] INFO com.example.playground.operators.RefCountOperator -- # subscribe 1: 1
+00:19:07.906 [main] INFO com.example.playground.operators.RefCountOperator -- # subscribe 1: 2
+00:19:07.906 [main] INFO com.example.playground.operators.RefCountOperator -- # subscribe 1: 3
+00:19:07.906 [main] INFO com.example.playground.operators.RefCountOperator -- # subscribe 2: 0
+00:19:07.906 [main] INFO com.example.playground.operators.RefCountOperator -- # subscribe 2: 1
+00:19:07.906 [main] INFO com.example.playground.operators.RefCountOperator -- # subscribe 2: 2
+00:19:07.906 [main] INFO com.example.playground.operators.RefCountOperator -- # subscribe 2: 3
+00:19:07.906 [main] INFO com.example.playground.operators.RefCountOperator -- # subscribe 2: 4
+```
+
+* 만약 위의 주석인 autoConnect() 를 해제하면 다음과 같은 결과를 볼 수 있다.
+
+```shell
+00:19:07.906 [main] INFO com.example.playground.operators.RefCountOperator -- # subscribe 1: 0
+00:19:07.906 [main] INFO com.example.playground.operators.RefCountOperator -- # subscribe 1: 1
+00:19:07.906 [main] INFO com.example.playground.operators.RefCountOperator -- # subscribe 1: 2
+00:19:07.906 [main] INFO com.example.playground.operators.RefCountOperator -- # subscribe 1: 3
+00:19:07.906 [main] INFO com.example.playground.operators.RefCountOperator -- # subscribe 2: 4
+00:19:07.906 [main] INFO com.example.playground.operators.RefCountOperator -- # subscribe 2: 5
+00:19:07.906 [main] INFO com.example.playground.operators.RefCountOperator -- # subscribe 2: 6
+00:19:07.906 [main] INFO com.example.playground.operators.RefCountOperator -- # subscribe 2: 7
+00:19:07.906 [main] INFO com.example.playground.operators.RefCountOperator -- # subscribe 2: 8
 ```
