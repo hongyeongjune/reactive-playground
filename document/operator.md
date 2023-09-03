@@ -464,3 +464,164 @@ fun main() {
 00:19:07.907 [main] INFO com.example.playground.operators.ErrorOnReturnOperator -- NAVER WEBTOON
 00:19:07.907 [main] INFO com.example.playground.operators.ErrorOnReturnOperator -- no name
 ```
+
+### onErrorResume
+![images]()
+>
+
+* 에러 이벤트가 발생했을 때, 에러 이벤트를 Downstream 으로 전파하지 않고, 대체 Publisher 를 리턴한다.
+
+```kotlin
+class OnErrorResumeOperator
+
+fun main() {
+    val logger = LoggerFactory.getLogger(OnErrorResumeOperator::class.java)
+    val keyword = "line"
+
+    val lineFlux = Flux.fromIterable(listOf("line"))
+        .filter { it == keyword }
+        .switchIfEmpty(Flux.error(IllegalArgumentException("is empty")))
+
+    Flux.fromIterable(listOf("naver", "naver webtoon"))
+        .filter { it == keyword }
+        .switchIfEmpty(Flux.error(IllegalArgumentException("is empty")))
+        .onErrorResume { lineFlux }
+        .subscribe (
+            { data -> logger.info("# onNext: $data") },
+            { error -> logger.error("# onError: $error") }
+        )
+
+    Thread.sleep(200L)
+}
+```
+
+```shell
+00:19:07.906 [main] INFO com.example.playground.operators.ErrorOnResumeOperator -- LINE
+```
+
+### onErrorContinue
+![images]()
+>
+
+* 에러가 발생했을 때, 에러 영역 내에 있는 데이터는 제거하고, Upstream 에서 후속 데이터를 emit 하는 방식으로 에러를 복구할 수 있도록 해준다.
+* 예를 들어, ```Flux.just(1, 2, 4, 0, 6, 12).map { 12 / it }```에서 4번 째 0 에서는 에러가 발생해도 6, 12 에 대한 값은 그대로 실행한다.
+
+### retry
+![images]()
+>
+
+* Publisher 가 데이터를 emit 하는 과정에서 에러가 발생하면 파라미터로 입력한 횟수만큼 원본 Flux 의 Sequence 를 다시 구독한다.
+
+### elapsed
+![images]()
+>
+
+* emit 된 데이터 사이의 경과 시간을 측정해서 Tuple<Long, T> 형태로 Downstream 에 emit 한다.
+* Tuple 의 Long 은 시간, T 는 데이터이다.
+* 첫 번째 데이터는 onSubscribe Signal 과 첫 번째 데이터 사이를 기준으로 시간을 측정한다.
+
+### window
+![images]()
+>
+
+* Upstream 에서 emit 되는 첫 번째 데이터부터 maxSize 숫자만큼 데이터를 포함하는 새로운 Flux 로 분할한다.
+* Reactor 에서는 이렇게 분리된 Flux 를 Window 라고 부른다.
+
+```kotlin
+class WindowOperator
+
+fun main() {
+    val logger = LoggerFactory.getLogger(WindowOperator::class.java)
+
+    Flux.range(1, 11)
+        .window(3)
+        .flatMap {
+            println("=======================")
+            it
+        }
+        .subscribe(object : BaseSubscriber<Int>() {
+            override fun hookOnSubscribe(subscription: Subscription) {
+                subscription.request(2)
+            }
+
+            override fun hookOnNext(value: Int) {
+                logger.info("# onNext: $value")
+                request(2)
+            }
+        })
+
+    Thread.sleep(200L)
+}
+```
+
+```shell
+00:19:07.906 [main] INFO com.example.playground.operators.WindowOperator -- =======================
+00:19:07.906 [main] INFO com.example.playground.operators.WindowOperator -- onNext 1
+00:19:07.906 [main] INFO com.example.playground.operators.WindowOperator -- onNext 2
+00:19:07.906 [main] INFO com.example.playground.operators.WindowOperator -- onNext 3
+00:19:07.906 [main] INFO com.example.playground.operators.WindowOperator -- =======================
+00:19:07.906 [main] INFO com.example.playground.operators.WindowOperator -- onNext 4
+00:19:07.906 [main] INFO com.example.playground.operators.WindowOperator -- onNext 5
+00:19:07.906 [main] INFO com.example.playground.operators.WindowOperator -- onNext 6
+00:19:07.906 [main] INFO com.example.playground.operators.WindowOperator -- =======================
+00:19:07.906 [main] INFO com.example.playground.operators.WindowOperator -- onNext 7
+00:19:07.906 [main] INFO com.example.playground.operators.WindowOperator -- onNext 8
+00:19:07.906 [main] INFO com.example.playground.operators.WindowOperator -- onNext 9
+00:19:07.906 [main] INFO com.example.playground.operators.WindowOperator -- =======================
+00:19:07.906 [main] INFO com.example.playground.operators.WindowOperator -- onNext 10
+00:19:07.906 [main] INFO com.example.playground.operators.WindowOperator -- onNext 11
+```
+
+### buffer
+![images]()
+>
+
+* Upstream 에서 emit 되는 첫 번째 데이터부터 maxSize 숫자만큼의 데이터를 List 버퍼로 한 번에 emit 한다.
+* 마지막 버퍼에 포함된 데이터의 개수는 maxSize 보다 더 적거나 같다.
+* 예를 들어, ```Flux.range(1, 95).buffer(10).subsribe(...)```의 경우에는 emit 된 데이터가 최대 10개까지 버퍼에 담기면 List 버퍼 형태로 Downstream 에 emit 한다.
+
+### bufferTimeout
+![images]()
+>
+
+* Upstream 에서 emit 되는 첫 번째 데이터부터 maxSize 숫자만큼의 데이터 또는 maxTime 내에 emit 된 데이터를 List 버퍼로 한 번에 emit 한다.
+* 또한, maxSize 혹은 maxTime 중 먼저 조건에 부합할 때까지 emit 된 데이터를 List 버퍼로 emit 한다.
+
+### groupBy
+![images]()
+>
+
+* emit 되는 데이터를 keyMapper 로 생성한 key를 기준으로 그룹화한 GroupedFlux 를 리턴하며, 이 GroupedFlux 를 통해서 그룹별로 작업을 수행할 수 있다.
+* groupBy 마블 다이어그램에서는 emit 되는 도형의 모양별로 그룹화하여 그룹별로 별도의 GroupedFlux Sequence 가 생성된 것을 볼 수 있다.
+
+### publish
+![images]()
+>
+
+* 구독을 하더라도 구독 시점에 즉시 데이터를 emit 하지 않고, connect() 를 호출하는 시점에 비로소 데이터를 emit 한다.
+* 그리고 Hot Sequence 로 변환되기 때문에 구독 시점 이후에 emit 된 데이터만 전달받을 수 있다.
+
+```kotlin
+class PublishOperator
+
+fun main() {
+    val logger = LoggerFactory.getLogger(PublishOperator::class.java)
+
+    val flux = Flux.range(1, 5)
+        .delayElements(Duration.ofMillis(300L))
+        .publish()
+
+    Thread.sleep(500L)
+    flux.subscribe { logger.info("# subscribe1: $it") }
+
+    Thread.sleep(200L)
+    flux.subscribe { logger.info("# subscribe2: $it") }
+
+    flux.connect()
+
+    Thread.sleep(1000L)
+    flux.subscribe { logger.info("# subscribe3: $it") }
+
+    Thread.sleep(2000L)
+}
+```
