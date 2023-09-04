@@ -29,6 +29,11 @@ dependencies {
     // https://mvnrepository.com/artifact/io.projectreactor/reactor-test
     testImplementation("io.projectreactor:reactor-test:3.5.8")
 
+    // webflux
+    // https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-webflux
+    implementation("org.springframework.boot:spring-boot-starter-webflux:3.1.0")
+
+
 }
 
 tasks.withType<KotlinCompile> {
