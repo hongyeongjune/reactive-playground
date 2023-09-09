@@ -10,7 +10,7 @@
   * 두 코루틴이 동시에 실행되는 것 처럼 보인다. = 동시성
   * 즉, 하나의 스레드에서도 동시성을 확보할 수 있다.
 
-#### Coroutine Builder
+### Coroutine Builder
 * 주어진 스코프안에서 새 코루틴을 만드는 함수이며 이미 존재하는 스코프 안에서만 호출 가능
 * 모든 코루틴 빌더 함수는 CoroutineScope 의 확장 함수이며 ```scopeA.launch는 scopeA``` 스코프 안에서 실행될 수 있는 새 코루틴을 생성한다.
 * scopeA 가 생략되면 launch 가 호출되는 위치를 포함하는 최하위 스코프에서 새 코루틴을 생성하고 아무런 스코프도 없는 곳에서 launch 를 호출하면 ```Unresolved reference: launch``` 컴파일 에러 발생
@@ -176,6 +176,71 @@ main @coroutine#1 : start
 main @coroutine#1 : end
 main @coroutine#2 : new routine
 ```
+
+### Coroutine Cancel
+> https://kotlinlang.org/docs/cancellation-and-timeouts.html
+
+* 필요하지 않은 코루틴을 적절히 취소해 컴퓨터 자원을 아끼는 것이 중요하다.
+* delay 나 yield 같은 suspend 함수를 사용하면 취소 여부를 체크해서 취소를 할 수 있다.
+  * delay 같은 함수도 내부적으로는 CancellationException 예외를 발생시켜 취소를 하고 있다. 
+  > All the suspending functions in kotlinx.coroutines are cancellable.  
+  > kotlinx.coroutines 패키지의 모든 일시 중단 함수들은 취소 가능하다.  
+  > They check for cancellation of coroutine and throw CancellationException when cancelled.  
+  > 그들은 Coroutine이 취소되었는지 확인하고 취소되었을 경우 CancellationException을 발생시킨다.  
+* isActive 를 통해서 현재 코루틴이 활성화되어있는지 취소신호를 받았는지 확인할 수 있다. (Dispatchers.DEFAULT : 코루틴을 다른 스레드에 배정)
+  * isActive 로 확인 후 CancellationException 을 던지면 곧장 취소가되고, 예외를 던지지 않아도 조건 설정을 잘하면 코루틴을 종료할 수 있다.
+
+```kotlin
+fun main(): Unit = runBlocking {
+  val job = launch {
+    var i = 1
+    var nextTime = System.currentTimeMillis()
+    while (i <= 5) {
+      if (nextTime <= System.currentTimeMillis()) {
+        println("${Thread.currentThread().name} : ${i++}")
+        nextTime += 1000L
+      }
+    }
+  }
+
+  delay(100L)
+  job.cancel()
+}
+```
+```shell
+main @coroutine#2 : 1
+main @coroutine#2 : 2
+main @coroutine#2 : 3
+main @coroutine#2 : 4
+main @coroutine#2 : 5
+```
+![images](https://github.com/hongyeongjune/reactive-playground/assets/39120763/eea3de55-9848-4543-832b-df88aa035a24)
+
+```kotlin
+fun main(): Unit = runBlocking {
+    val job = launch(Dispatchers.Default) {
+        var i = 1
+        var nextTime = System.currentTimeMillis()
+        while (i <= 5) {
+            if (nextTime <= System.currentTimeMillis()) {
+                println("${Thread.currentThread().name} : ${i++}")
+                nextTime += 1000L
+            }
+
+            if (!isActive) {
+                throw CancellationException()
+            }
+        }
+    }
+
+    delay(100L)
+    job.cancel()
+}
+```
+```shell
+DefaultDispatcher-worker-1 @coroutine#2 : 1
+```
+![images](https://github.com/hongyeongjune/reactive-playground/assets/39120763/124bd19d-d3f4-4284-b0ae-555e66f6bf6a)
 
 #### Structured concurrency
 * 코루틴은 ```Structured concurrency```원칙을 따르는데, 이는 새로운 코루틴이 코루틴의 수명을 제한하는 특정 코루틴 스코프에서만 실행될 수 있다는 것을 의미한다.
