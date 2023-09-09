@@ -242,6 +242,50 @@ DefaultDispatcher-worker-1 @coroutine#2 : 1
 ```
 ![images](https://github.com/hongyeongjune/reactive-playground/assets/39120763/124bd19d-d3f4-4284-b0ae-555e66f6bf6a)
 
+### Coroutine Exception
+> https://kotlinlang.org/docs/exception-handling.html
+
+* launch 는 예외가 발생하면, 예외를 출력하고 코루틴이 종료된다.
+* 부모 코루틴이 다른 상황에서 async 는 예외가 발생해도 예외를 출력하지 않는다. await()이 필요하다.
+* 즉, 코루틴의 예외는 부모에 전파된다.
+* SupervisorJob()을 사용하면 부모 코루틴에게 예외를 전파하지 않는다.
+* CoroutineExceptionHandler 는 launch 에만 적용이 가능하고, 부모 코루틴이 있으면 동작하지 않는다.
+* delay 같은 함수에서 CancelException 이 발생하면 취소로 간주하고 부모 코루틴으로 전파하지 않는다.
+* 그 외 다른 Exception 이 발생하면 취소로 간주하고 부모 코루틴으로 전판한다.
+* 다만, 내부적으로는 둘 다 "취소됨" 상태로 관리한다.
+* 공식문서를 보면 다음과 같은 문구가 있다. : We already know that a cancelled coroutine throws CancellationException in suspension points and that it is ignored by the coroutines' machinery.
+  * 우리는 취소된 Coroutine이 일시중단 지점에서 CancellationException을 발생시키고 이것이 Coroutine의 동작원리에 의해서 무시되는 것을 알고 있다. 
+
+```kotlin
+fun main(): Unit = runBlocking {
+    val coroutineExceptionHandler = CoroutineExceptionHandler { coroutineContext, throwable ->
+        println("${Thread.currentThread().name} : 예외발생")
+    }
+
+    CoroutineScope(Dispatchers.Default).launch(coroutineExceptionHandler) {
+        throw IllegalArgumentException()
+    }
+
+    delay(1000L)
+}
+```
+```shell
+DefaultDispatcher-worker-1 @coroutine#2 : 예외발생
+```
+
+#### Cancellation and exceptions
+* Coroutine은 내부적으로 취소를 위해 CancellationException을 사용하며, 이 예외는 모든 Handler에서 무시된다.
+* 따라서 이들은 catch블록으로부터 얻을 수 있는 추가적인 디버그 정보를 위해서만 사용되어야 한다.
+* Coroutine이 Job.cancel을 사용해 취소될 경우 종료되지만, 부모 Coroutine의 실행을 취소하지는 않는다.
+* 만약 Coroutine이 CancellationException 말고 다른 예외를 만난다면, 그 예외로 부모 Coroutine까지 취소한다. 
+* 이 동작은 재정의할 수 없으며, 구조화된 동시성을 위해 안정적인 Coroutine 계층구조를 제공하는데 사용된다. 
+> Coroutines internally use CancellationException for cancellation, these exceptions are ignored by all handlers,  
+> so they should be used only as the source of additional debug information, which can be obtained by catch block.     
+> When a coroutine is cancelled using Job.cancel, it terminates, but it does not cancel its parent.  
+> If a coroutine encounters an exception other than CancellationException, it cancels its parent with that exception.  
+> This behaviour cannot be overridden and is used to provide stable coroutines hierarchies for structured concurrency.
+
+
 #### Structured concurrency
 * 코루틴은 ```Structured concurrency```원칙을 따르는데, 이는 새로운 코루틴이 코루틴의 수명을 제한하는 특정 코루틴 스코프에서만 실행될 수 있다는 것을 의미한다.
 * 위의 예제를 보면, runBlocking 이 해당 범위를 설정하고 delay(1000L) 후 World! 가 출력될 때까지 기다렸다가 종료하는 이유다.
