@@ -283,12 +283,89 @@ DefaultDispatcher-worker-1 @coroutine#2 : 예외발생
 > so they should be used only as the source of additional debug information, which can be obtained by catch block.     
 > When a coroutine is cancelled using Job.cancel, it terminates, but it does not cancel its parent.  
 > If a coroutine encounters an exception other than CancellationException, it cancels its parent with that exception.  
-> This behaviour cannot be overridden and is used to provide stable coroutines hierarchies for structured concurrency.
+> This behaviour cannot be overridden and is used to provide stable coroutines hierarchies for structured concurrency.  
 
-
-#### Structured concurrency
+### Structured concurrency
 * 코루틴은 ```Structured concurrency```원칙을 따르는데, 이는 새로운 코루틴이 코루틴의 수명을 제한하는 특정 코루틴 스코프에서만 실행될 수 있다는 것을 의미한다.
-* 위의 예제를 보면, runBlocking 이 해당 범위를 설정하고 delay(1000L) 후 World! 가 출력될 때까지 기다렸다가 종료하는 이유다.
-* 실제 애플리케이션에서는 많은 코루틴을 실행하게 된다.
-* ```Structured concurrency```는 이러한 코루틴이 손실되지 않고 누수되지 않도록 보장한다.
-* 외부 Scope 는 모든 자식 코루틴이 완료될 때까지 완료될 수 없고, ```Structured concurrency```는 코드의 모든 오류가 제대로 보고되고 손실되지 않도록 보장합니다.
+* 실제 애플리케이션에서는 많은 코루틴을 실행하게 된다. ```Structured concurrency```는 이러한 코루틴이 손실되지 않고 누수되지 않도록 보장한다.
+* 외부 Scope 는 모든 자식 코루틴이 완료될 때까지 완료될 수 없고, ```Structured concurrency```는 코드의 모든 오류가 제대로 보고되고 손실되지 않도록 보장한다.
+* 즉, 자식 코루틴에서 예외가 발생하면 Structured Concurrency 에 의해 부모 코루틴이 취소되고, 부모 코루틴의 다른 자식 코루틴들도 취소된다.
+* 또한, 자식 코루틴에서 예외가 발생하지 않더라도, 부모 코루틴이 취소되면, 자식 코루틴들이 취소된다.
+* 다만, CancellationException 은 정상적인 취소로 간주하기 대문에 부모 코루틴에게 전파되지 않고, 부모 코루틴의 다른 자식 코루틴을 취소시키지도 않는다.
+
+### CoroutineScope
+> https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/-coroutine-scope/index.html
+* 코루틴이 실행될 수 있는 영역/범위
+* 코루틴은 스코프 내에서만 실행될 수 있고, 아무런 스코프가 없는 곳에서는 실행될 수 없다
+* 일반적으로 모든 스코프는 결국 GlobalScope 를 뿌리로 해서 생겨나며 따라서 일반적인 스코프는 모두 GlobalScope 의 하위 스코프다.
+* 예외적으로 GlobalScope.async 나 GlobalScope.launch 를 사용해서 각각 독립적인 최상위 스코프를 생성해서 사용할 수도 있다.
+* 하위 스코프에서 생성된 코루틴이 완료되기 전에는 상위 스코프의 코루틴도 완료될 수 없다.
+* CoroutineContext 를 보관하는 역할을 한다.
+
+```kotlin
+public interface CoroutineScope {
+  public val coroutineContext: CoroutineContext
+}
+```
+
+### CoroutineContext
+> https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.coroutines/-coroutine-context/
+* CoroutineScope 의 property 로서 스코프와 생명주기를 함께 한다.
+* 스코프 안에 있는 코루틴(들)이 스코프 안에서 전역적으로 사용될 수 있는 문맥(정보 및 함수 저장소)
+* 즉, 코루틴과 관련된 데이털르 보관한다.
+* 컨텍스트 내용 중 중요한 것은 Job 과 Dispatcher
+* indexed set 이라는, set 과 map 을 혼합한 자료 구조 사용
+* 컨텍스트의 요소는 모두 Element 를 상속받은 타입인데 Element 타입도 CoroutineContext 를 상속받은 타입이다
+* 따라서 하나의 디스패처가 곧 컨텍스트이기도 하며, + 연산자를 사용해서 디스패처 + 잡 + 이름 + ...와 같이 모두를 포함하는 컨텍스트를 만들 수도 있다
+* 컨텍스트 내용은 불변이며, 스코프의 컨텍스트도 val 로 선언돼 있으므로 교체 불가
+* +, -를 사용해서 컨텍스트 내용에 추가/삭제한 새로운 컨텍스트를 만들어서 withContext 의 인자로 전달해줄 수는 있음
+* 기본값으로 아무 정보도 포함하지 않는 EmptyCoroutineContext 가 주로 사용 된다.
+
+### CoroutineDispatcher
+* 코루틴이 어느 스레드에서 실행/재개 될 지 지정하는 역할
+* Coroutine Dispatcher 는 Coroutine 의 실행될 사용될 스레드를 특정 스레드로 제한하거나 스레드풀에 분배하거나, 제한 없이 실행 되도록 할 수 있다
+  > The coroutine dispatcher can confine coroutine execution to a specific thread, dispatch it to a thread pool, or let it run unconfined.
+
+```kotlin
+launch { // context of the parent, main runBlocking coroutine
+    println("main runBlocking      : I'm working in thread ${Thread.currentThread().name}")
+}
+launch(Dispatchers.Default) { // will get dispatched to DefaultDispatcher 
+    println("Default               : I'm working in thread ${Thread.currentThread().name}")
+}
+launch(newSingleThreadContext("MyOwnThread")) { // will get its own new thread
+    println("newSingleThreadContext: I'm working in thread ${Thread.currentThread().name}")
+}
+```
+
+* 순서는 다를 수 있음
+```shell
+Default               : I'm working in thread DefaultDispatcher-worker-1
+newSingleThreadContext: I'm working in thread MyOwnThread
+main runBlocking      : I'm working in thread main
+```
+
+* launch { ... }가 파라미터 없이 사용된다면, 실행되는 CoroutineScope 으로 부터 Context 를 상속 받는다(Dispatcher도 같이). 
+* 이런 경우 main 함수의 runBlocking Coroutine 으로부터 Context 를 상속 받아 Main Thread 에서 실행되게 된다.
+* Default Dispatcher 은 Scope 내에서 다른 Dispatcher 을 사용이 명시적으로 지정되지 않았을 때 사용된다. Dispatchers.Default 로 표기되며, 스레드들이 공유하는 Background Pool 을 사용한다.
+* newSingleThreadContext 는 Coroutine 이 실행되기 위한 새로운 단일 스레드를 생성한다. 
+* 전용 스레드는 매우 비싼 리소스이다. 실제 어플리케이션에서 더 이상 필요하지 않을 때 close 함수를 사용해 해제되어야 하며, 최상위 레벨의 변수에 저장하여 어플리케이션이 실행되는 동안 재사용 될 수 있도록 해야 한다.
+> When launch { ... } is used without parameters, it inherits the context (and thus dispatcher) from the CoroutineScope it is being launched from. In this case, it inherits the context of the main runBlocking coroutine which runs in the main thread.  
+> The default dispatcher is used when no other dispatcher is explicitly specified in the scope. It is represented by Dispatchers.Default and uses a shared background pool of threads.  
+> newSingleThreadContext creates a thread for the coroutine to run. A dedicated thread is a very expensive resource. In a real application it must be either released, when no longer needed, using the close function, or stored in a top-level variable and reused throughout the application.  
+
+
+
+
+#### Dispatchers.Default
+* 명시적으로 지정하지 않으면 사용되는 디스패처
+* JVM 의 공유 스레드풀을 사용하고 동시 작업 가능한 최대 갯수는 CPU 의 코어 수와 같다.
+* CPU 를 많이 소모하는 연산 집중 코루틴에 적합
+
+#### Dispatchers.IO
+* 필요에 따라 추가적으로 스레드를 더 생성하거나 줄일 수 있으며 최대 64개까지 생성이 가능하다.
+* File I/O, blocking socket I/O 처럼 블로킹 연산에 적합
+
+#### Dispatchers.Main
+* UI 객체가 사용되는 main 스레드에서 실행/재개
+* 보통 싱글 스레드 환경에서 사용
