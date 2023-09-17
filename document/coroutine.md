@@ -354,9 +354,6 @@ main runBlocking      : I'm working in thread main
 > The default dispatcher is used when no other dispatcher is explicitly specified in the scope. It is represented by Dispatchers.Default and uses a shared background pool of threads.  
 > newSingleThreadContext creates a thread for the coroutine to run. A dedicated thread is a very expensive resource. In a real application it must be either released, when no longer needed, using the close function, or stored in a top-level variable and reused throughout the application.  
 
-
-
-
 #### Dispatchers.Default
 * 명시적으로 지정하지 않으면 사용되는 디스패처
 * JVM 의 공유 스레드풀을 사용하고 동시 작업 가능한 최대 갯수는 CPU 의 코어 수와 같다.
@@ -369,3 +366,20 @@ main runBlocking      : I'm working in thread main
 #### Dispatchers.Main
 * UI 객체가 사용되는 main 스레드에서 실행/재개
 * 보통 싱글 스레드 환경에서 사용
+
+### suspend
+* 코루틴이 중지 되었다가 재개 될 수 있는 지점 
+
+### Continuation
+* CPS(Continuation Passing Style)패러다임이 적용되어 있다. (호출되는 함수에 Conitnuation 을 전달하고, 각 함수의 작업이 완료되는 대로 전달받은 Continuation 을 호출하는 패러다임)
+
+```kotlin
+public interface Continuation<in T> {
+    public val context: CoroutineContext
+    public fun resumeWith(result: Result<T>)
+}
+```
+
+* resumeWith : 특정 함수가 suspend 되어야할 때, 현재 함수에서 결과 값을 T 로 받게 해주는 함수
+* context : 각 Continuation 이 특정 스레드 혹은 스레드 풀에서 실행되는 것을 허용
+* 즉, 코루틴은 suspend-resume 을 내부적으로 사용하면서 중단되었다가 콜백 호출하여 다시 진행하는 것 이다.
